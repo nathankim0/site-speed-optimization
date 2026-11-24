@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v1.0.0 (2026-11-24)
+
 ### Added
 - `SKILL.md`: principles, six-step workflow with what to run and report at each step, symptom → cause → reference table, budgets, checklist, post-cache verification.
 - `references/`: caching, rendering, frontend, backend, stacks (Next.js 14/15/16, Cloudflare, Vercel, Nginx + CloudFront, Astro, Remix), measurement, migration, case studies, conflicts (21 rulings).
