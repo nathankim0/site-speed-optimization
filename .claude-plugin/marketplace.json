@@ -1,0 +1,16 @@
+{
+  "name": "site-speed-optimization",
+  "owner": { "name": "nathankim0", "url": "https://github.com/nathankim0" },
+  "metadata": {
+    "description": "An agent skill that takes a slow website from diagnosis to measured fix.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "site-speed-optimization",
+      "source": "./",
+      "description": "Diagnose and fix slow websites: cache layers, rendering, Core Web Vitals, backend, and measured before/after verification.",
+      "category": "development"
+    }
+  ]
+}

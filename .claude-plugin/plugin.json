@@ -1,0 +1,11 @@
+{
+  "name": "site-speed-optimization",
+  "version": "1.0.0",
+  "description": "Diagnose and fix slow websites: cache layers, rendering, Core Web Vitals, backend, and measured before/after verification.",
+  "author": { "name": "nathankim0", "url": "https://github.com/nathankim0" },
+  "homepage": "https://github.com/nathankim0/site-speed-optimization",
+  "repository": "https://github.com/nathankim0/site-speed-optimization",
+  "license": "MIT",
+  "keywords": ["web-performance", "core-web-vitals", "caching", "cdn", "lighthouse", "ssr", "agent-skills"],
+  "skills": ["./"]
+}
