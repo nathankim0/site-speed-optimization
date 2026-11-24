@@ -198,7 +198,9 @@ async function main() {
       for (const r of warned) for (const w of r.warnings) console.log(`  ${r.path}: ${w}`);
     }
   }
-  process.exit(differing.length ? 1 : 0);
+  // Set the code and return instead of process.exit(): piped stdout is async and
+  // exiting early would cut off large --json output.
+  process.exitCode = differing.length ? 1 : 0;
 }
 
 main().catch((e) => fail(e.stack || String(e)));

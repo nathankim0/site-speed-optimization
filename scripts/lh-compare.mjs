@@ -100,9 +100,16 @@ function lighthouseArgs(o, url, outFile) {
 
 function run(cmd, args) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { maxBuffer: 64 * 1024 * 1024, shell: process.platform === 'win32' },
-      (err, stdout, stderr) => resolve({ err, stdout, stderr }));
+    execFile(cmd, args, { maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => resolve({ err, stdout, stderr }));
   });
+}
+
+// On Windows, npx is a .cmd file and needs a shell, which would split URLs at "&".
+// Run npm's npx-cli.js with node directly instead, so arguments pass through untouched.
+function npxCommand() {
+  if (process.platform !== 'win32') return { cmd: 'npx', prefix: [] };
+  const cli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js');
+  return { cmd: process.execPath, prefix: [cli] };
 }
 
 function extract(lhr) {
@@ -111,7 +118,8 @@ function extract(lhr) {
   const byType = Object.fromEntries(items.map((it) => [it.resourceType, it]));
   const m = {};
   for (const [key, , id] of METRICS) if (id) m[key] = a[id]?.numericValue ?? null;
-  m.bytes = byType.total ? byType.total.transferSize / 1024 : (a['total-byte-weight']?.numericValue ?? 0) / 1024;
+  const tbw = a['total-byte-weight']?.numericValue;
+  m.bytes = byType.total ? byType.total.transferSize / 1024 : tbw != null ? tbw / 1024 : null;
   m.jsBytes = byType.script ? byType.script.transferSize / 1024 : null;
   m.jsReqs = byType.script?.requestCount ?? null;
   m.reqs = byType.total?.requestCount ?? null;
@@ -158,7 +166,7 @@ function table(rows) {
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
-  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const npx = npxCommand();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const outDir = path.resolve(o.out, stamp);
   await mkdir(outDir, { recursive: true });
@@ -176,7 +184,7 @@ async function main() {
       const url = o.urls[labels.indexOf(l)];
       const file = path.join(outDir, `${l}-run${r}.json`);
       process.stderr.write(`run ${r}/${o.runs} ${l} ${url} ... `);
-      const { err, stderr } = await run(npx, lighthouseArgs(o, url, file));
+      const { err, stderr } = await run(npx.cmd, [...npx.prefix, ...lighthouseArgs(o, url, file)]);
       let lhr = null;
       try { lhr = JSON.parse(await readFile(file, 'utf8')); } catch { /* handled below */ }
       if (err || !lhr || lhr.runtimeError) {
@@ -244,8 +252,9 @@ async function main() {
     rows.push(row);
   }
   console.log('\n' + table(rows));
-  if (labels.length === 2) console.log('\nLower is better for every metric above. "no clear change" = the 95% interval includes 0 or the gap is under 1% (and under 10ms / 1KB / 0.01 CLS / 1 request).');
-    if (o.runs < 5) console.log('Verdicts need at least 5 runs per URL; 7 to 11 is better.');
+  if (labels.length === 2) console.log('\nLower is better for every metric above. "no clear change" = the 95% interval includes 0, or the gap is smaller than both 1% of A and 10ms / 1KB / 0.01 CLS / 1 request.');
+  if (labels.length === 2) console.log('With 10 metrics, one may differ by chance; judge by the primary metric you chose before measuring.');
+  if (labels.length === 2 && o.runs < 5) console.log('Verdicts need at least 5 runs per URL; 7 to 11 is better.');
   if (errors.length) console.log(`\n${errors.length} run(s) failed; see --json for details.`);
   console.log(`\nRaw reports: ${outDir}`);
 }

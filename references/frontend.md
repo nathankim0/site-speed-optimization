@@ -127,13 +127,17 @@ X 시험: 서버에 5초 지연을 넣었을 때 React는 589ms에 연결됐고 
 <link rel="stylesheet" href="/app.css" id="main-css">
 <script>
   (function () {
+    var started = false;
     function boot() {
+      if (started) return; started = true;
       var s = document.createElement('script');
       s.type = 'module'; s.src = '/entry.js'; s.async = true;
       document.head.appendChild(s);
     }
     var css = document.getElementById('main-css');
-    if (css.sheet) boot(); else css.addEventListener('load', boot, { once: true });
+    // CSS가 실패해도(404, 차단) 앱은 떠야 하므로 error에서도 시작한다.
+    if (css.sheet) boot();
+    else { css.addEventListener('load', boot, { once: true }); css.addEventListener('error', boot, { once: true }); }
   })();
 </script>
 ```
@@ -155,7 +159,7 @@ X는 비로그인 게시물 FCP가 7,216ms에서 1,804ms, 프로필이 3,064ms�
 1. 먼저 꼭 필요한지 묻는다. 쓰지 않는 태그, 중복 분석 도구를 지운다.
 2. 필요하면 지연 로드한다: 첫 상호작용 뒤, 또는 `requestIdleCallback` 뒤에 넣는다.
 3. 무거운 위젯은 파사드로 바꾼다: 유튜브 임베드는 썸네일 이미지와 재생 버튼만 두고 클릭할 때 iframe을 넣는다. 채팅 위젯도 버튼만 먼저 그린다.
-4. `lh-compare.mjs`로 서드파티를 막은 상태와 비교하려면 Lighthouse의 `--blocked-url-patterns`를 직접 실행해 차이를 잰다.
+4. 서드파티의 비용을 재려면 Lighthouse를 직접 실행해 `--blocked-url-patterns`로 서드파티를 막은 결과와 막지 않은 결과를 비교한다. `lh-compare.mjs`는 이 옵션을 넘기지 않는다.
 
 ## 9. i18n
 

@@ -100,6 +100,9 @@ cache_state() { # normalize the cache result from any CDN header to HIT / MISS /
   for k in cf-cache-status x-vercel-cache x-cache-status x-nextjs-cache x-cache; do
     v="$(header "$f" "$k")"
     [ -n "$v" ] || continue
+    # Fastly lists one entry per cache layer ("HIT, MISS" = shield hit, edge miss);
+    # the last entry is the cache closest to the client.
+    [ "$k" = "x-cache" ] && v="$(printf '%s' "$v" | awk -F', *' '{ print $NF }')"
     v="$(printf '%s' "$v" | tr '[:lower:]' '[:upper:]')"
     case "$v" in
       *REFRESHHIT*|*REVALIDATED*) echo "REVALIDATED"; return ;;
@@ -118,7 +121,8 @@ cache_state() { # normalize the cache result from any CDN header to HIT / MISS /
 WARN=()
 warn() { WARN+=("$1"); }
 
-hits=0; set_cookie_hit_values=""; any_html=0; status_first=""
+hits=0; hit_cookie_responses=0; any_html=0; status_first=""
+: > "$TMP/hit-cookies"
 i=1
 while [ "$i" -le "$RUNS" ]; do
   read -r code ttfb < "$TMP/w$i"
@@ -130,7 +134,16 @@ while [ "$i" -le "$RUNS" ]; do
   case "$ct" in *text/html*) any_html=1 ;; esac
   if [ "$state" = "HIT" ] || [ "$state" = "REVALIDATED" ]; then
     hits=$((hits + 1))
-    [ -n "$sc" ] && set_cookie_hit_values="$set_cookie_hit_values${sc}"$'\n'
+    if [ -n "$sc" ]; then
+      hit_cookie_responses=$((hit_cookie_responses + 1))
+      # one "name=value" per Set-Cookie line, deduplicated within this response
+      awk '/^HTTP\// { n = 0; delete seen } {
+             line = $0; sub(/\r$/, "", line)
+             if (tolower(substr(line, 1, 11)) == "set-cookie:") {
+               v = substr(line, 12); sub(/^[ \t]+/, "", v); sub(/;.*/, "", v)
+               if (!(v in seen)) { seen[v] = 1; print v }
+             } }' "$TMP/h$i" >> "$TMP/hit-cookies"
+    fi
   fi
   i=$((i + 1))
 done
@@ -150,13 +163,13 @@ case "$status_first" in
       warn "status $status_first: the response may be a block or error page, not the real page."
     fi ;;
 esac
-if [ "$any_html" = 1 ] && [ -n "$set_cookie_hit_values" ]; then
-  total_sc="$(printf '%s' "$set_cookie_hit_values" | sed '/^$/d' | wc -l | tr -d ' ')"
-  distinct="$(printf '%s' "$set_cookie_hit_values" | sed '/^$/d' | sort -u | wc -l | tr -d ' ')"
-  if [ "$total_sc" -lt 2 ]; then
+if [ "$any_html" = 1 ] && [ "$hit_cookie_responses" -gt 0 ]; then
+  # A cookie whose exact name=value shows up in two or more HIT responses was cached.
+  repeated="$(sort "$TMP/hit-cookies" | uniq -d | sed 's/=.*//' | sort -u | tr '\n' ' ' | sed 's/ $//')"
+  if [ "$hit_cookie_responses" -lt 2 ]; then
     warn "an HTML cache HIT carries Set-Cookie. Run with more requests to see whether the value repeats (cached cookie, critical) or changes (added at the edge)."
-  elif [ "$distinct" = 1 ]; then
-    warn "CRITICAL (likely): cached HTML responses (HIT) carry the SAME Set-Cookie value, so the cookie was probably stored in the shared cache and is sent to every visitor. Confirm with a larger --interval; CloudFront does this when cookies are forwarded."
+  elif [ -n "$repeated" ]; then
+    warn "CRITICAL (likely): cached HTML responses (HIT) repeat the same Set-Cookie value for: $repeated. The cookie was probably stored in the shared cache and is sent to every visitor. Confirm with a larger --interval; CloudFront does this when cookies are forwarded."
   else
     warn "HTML HIT responses carry Set-Cookie, but the value changes per request, so the edge probably adds it after the cache. Confirm the cookie holds no session or personal data."
   fi

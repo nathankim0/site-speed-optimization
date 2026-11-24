@@ -52,7 +52,7 @@ Headers (last response):
   set-cookie:        present
 
 Warnings:
-  - CRITICAL (likely): cached HTML responses (HIT) carry the SAME Set-Cookie value, so the cookie was probably stored in the shared cache and is sent to every visitor. Confirm with a larger --interval; CloudFront does this when cookies are forwarded.
+  - CRITICAL (likely): cached HTML responses (HIT) repeat the same Set-Cookie value for: sid. The cookie was probably stored in the shared cache and is sent to every visitor. Confirm with a larger --interval; CloudFront does this when cookies are forwarded.
   - Vary includes Cookie: every distinct cookie gets its own cache entry, so shared caching almost never hits. Vercel does not cache Vary: Cookie responses at all.
   - no content-encoding: the response is not compressed (gzip/br/zstd) for a client that accepts it.
 ```

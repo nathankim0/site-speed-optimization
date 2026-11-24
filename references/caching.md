@@ -178,7 +178,7 @@ SELECT
   count(*)                                              AS requests,
   avg(CASE WHEN x_edge_result_type IN ('Hit','RefreshHit') THEN 1 ELSE 0 END) AS hit_rate,
   count(*) * (1 - avg(CASE WHEN x_edge_result_type IN ('Hit','RefreshHit') THEN 1 ELSE 0 END)) AS origin_requests
-FROM read_csv('logs/*.gz', delim='\t', header=false, columns={...})
+FROM read_csv('logs/*.gz', delim='\t', header=false, skip=2, columns={...})  -- 파일 앞 #Version, #Fields 두 줄 건너뜀
 GROUP BY 1
 ORDER BY origin_requests DESC;
 ```
